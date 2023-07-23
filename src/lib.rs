@@ -1,4 +1,5 @@
-use futures::FutureExt;
+use std::future::Future;
+use std::pin::Pin;
 use std::task::Poll;
 
 #[allow(clippy::module_name_repetitions)]
@@ -41,46 +42,46 @@ impl TlsOrTcpConnection {
 
 impl tokio::io::AsyncRead for TlsOrTcpConnection {
     fn poll_read(
-        self: std::pin::Pin<&mut Self>,
+        self: Pin<&mut Self>,
         cx: &mut std::task::Context<'_>,
         buf: &mut tokio::io::ReadBuf<'_>,
     ) -> Poll<std::io::Result<()>> {
         match self.get_mut() {
-            Self::Plain(tcp, _) => std::pin::Pin::new(tcp).poll_read(cx, buf),
-            Self::Tls(tls, _) => std::pin::Pin::new(tls).poll_read(cx, buf),
+            Self::Plain(tcp, _) => Pin::new(tcp).poll_read(cx, buf),
+            Self::Tls(tls, _) => Pin::new(tls).poll_read(cx, buf),
         }
     }
 }
 
 impl tokio::io::AsyncWrite for TlsOrTcpConnection {
     fn poll_write(
-        self: std::pin::Pin<&mut Self>,
+        self: Pin<&mut Self>,
         cx: &mut std::task::Context<'_>,
         buf: &[u8],
     ) -> Poll<Result<usize, std::io::Error>> {
         match self.get_mut() {
-            Self::Plain(tcp, _) => std::pin::Pin::new(tcp).poll_write(cx, buf),
-            Self::Tls(tls, _) => std::pin::Pin::new(tls).poll_write(cx, buf),
+            Self::Plain(tcp, _) => Pin::new(tcp).poll_write(cx, buf),
+            Self::Tls(tls, _) => Pin::new(tls).poll_write(cx, buf),
         }
     }
 
     fn poll_flush(
-        self: std::pin::Pin<&mut Self>,
+        self: Pin<&mut Self>,
         cx: &mut std::task::Context<'_>,
     ) -> Poll<Result<(), std::io::Error>> {
         match self.get_mut() {
-            Self::Plain(tcp, _) => std::pin::Pin::new(tcp).poll_flush(cx),
-            Self::Tls(tls, _) => std::pin::Pin::new(tls).poll_flush(cx),
+            Self::Plain(tcp, _) => Pin::new(tcp).poll_flush(cx),
+            Self::Tls(tls, _) => Pin::new(tls).poll_flush(cx),
         }
     }
 
     fn poll_shutdown(
-        self: std::pin::Pin<&mut Self>,
+        self: Pin<&mut Self>,
         cx: &mut std::task::Context<'_>,
     ) -> Poll<Result<(), std::io::Error>> {
         match self.get_mut() {
-            Self::Plain(tcp, _) => std::pin::Pin::new(tcp).poll_shutdown(cx),
-            Self::Tls(tls, _) => std::pin::Pin::new(tls).poll_shutdown(cx),
+            Self::Plain(tcp, _) => Pin::new(tcp).poll_shutdown(cx),
+            Self::Tls(tls, _) => Pin::new(tls).poll_shutdown(cx),
         }
     }
 }
@@ -90,7 +91,7 @@ impl hyper::server::accept::Accept for &mut HyperTlsOrTcpAcceptor {
     type Error = std::io::Error;
 
     fn poll_accept(
-        mut self: std::pin::Pin<&mut Self>,
+        mut self: Pin<&mut Self>,
         cx: &mut std::task::Context<'_>,
     ) -> Poll<Option<Result<Self::Conn, Self::Error>>> {
         if self.accept_future.is_none() {
@@ -114,7 +115,7 @@ impl hyper::server::accept::Accept for &mut HyperTlsOrTcpAcceptor {
             }
         }
         if let Some(accept_future) = &mut self.accept_future {
-            match accept_future.poll_unpin(cx) {
+            match Pin::new(accept_future).poll(cx) {
                 Poll::Pending => return Poll::Pending,
                 Poll::Ready(tls) => {
                     self.accept_future = None;
