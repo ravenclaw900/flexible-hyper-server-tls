@@ -1,4 +1,3 @@
-use anyhow::Context;
 use futures::FutureExt;
 use std::task::Poll;
 
@@ -88,7 +87,7 @@ impl tokio::io::AsyncWrite for TlsOrTcpConnection {
 
 impl hyper::server::accept::Accept for &mut HyperTlsOrTcpAcceptor {
     type Conn = TlsOrTcpConnection;
-    type Error = anyhow::Error;
+    type Error = std::io::Error;
 
     fn poll_accept(
         mut self: std::pin::Pin<&mut Self>,
@@ -108,7 +107,7 @@ impl hyper::server::accept::Accept for &mut HyperTlsOrTcpAcceptor {
                         }
                     }
                     Err(err) => {
-                        return Poll::Ready(Some(Err(err).context("Couldn't make TCP connection")));
+                        return Poll::Ready(Some(Err(err)));
                     }
                 },
                 Poll::Pending => return Poll::Pending,
@@ -122,9 +121,7 @@ impl hyper::server::accept::Accept for &mut HyperTlsOrTcpAcceptor {
                     let tls = match tls {
                         Ok(tls) => tls,
                         Err(err) => {
-                            return Poll::Ready(Some(
-                                Err(err).context("Couldn't encrypt TCP connection"),
-                            ));
+                            return Poll::Ready(Some(Err(err)));
                         }
                     };
                     let remote_addr = self.remote_addr.take().unwrap_or_else(|| {
