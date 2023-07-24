@@ -60,14 +60,12 @@ impl Accept for HyperHttpOrHttpsAcceptor {
         match &mut this.kind {
             // If just a normal HTTP connection, just poll to accept the new TCP connection
             AcceptorKind::Http => match this.listener.poll_accept(cx) {
-                Poll::Ready(Ok(stream)) => {
-                    return Poll::Ready(Some(Ok(HttpOrHttpsConnection {
-                        remote_addr: stream.1,
-                        kind: ConnKind::Http(stream.0),
-                    })))
-                }
-                Poll::Ready(Err(err)) => return Poll::Ready(Some(Err(err))),
-                Poll::Pending => return Poll::Pending,
+                Poll::Ready(Ok(stream)) => Poll::Ready(Some(Ok(HttpOrHttpsConnection {
+                    remote_addr: stream.1,
+                    kind: ConnKind::Http(stream.0),
+                }))),
+                Poll::Ready(Err(err)) => Poll::Ready(Some(Err(err))),
+                Poll::Pending => Poll::Pending,
             },
             // Otherwise, if it's an HTTPS connection, check if we're ready to encrypt the connection
             // Weird control flow here (if then another if) to avoid returning an unnecessary Poll::Pending
@@ -82,7 +80,7 @@ impl Accept for HyperHttpOrHttpsAcceptor {
                             *encryption_future = Some(HttpsEncryptionFuture {
                                 future: tls_acceptor.accept(stream.0),
                                 remote_addr: stream.1,
-                            })
+                            });
                         }
                         Poll::Ready(Err(err)) => return Poll::Ready(Some(Err(err))),
                         Poll::Pending => return Poll::Pending,
@@ -91,16 +89,14 @@ impl Accept for HyperHttpOrHttpsAcceptor {
                 // Unwrap is safe because encryption_future has to have been created by now
                 let encryption_future = encryption_future.as_mut().unwrap();
                 match Pin::new(&mut encryption_future.future).poll(cx) {
-                    Poll::Ready(Ok(tls_stream)) => {
-                        return Poll::Ready(Some(Ok(HttpOrHttpsConnection {
-                            remote_addr: encryption_future.remote_addr,
-                            kind: ConnKind::Https(tls_stream),
-                        })));
-                    }
-                    Poll::Ready(Err(err)) => return Poll::Ready(Some(Err(err))),
-                    Poll::Pending => return Poll::Pending,
+                    Poll::Ready(Ok(tls_stream)) => Poll::Ready(Some(Ok(HttpOrHttpsConnection {
+                        remote_addr: encryption_future.remote_addr,
+                        kind: ConnKind::Https(tls_stream),
+                    }))),
+                    Poll::Ready(Err(err)) => Poll::Ready(Some(Err(err))),
+                    Poll::Pending => Poll::Pending,
                 }
             }
-        };
+        }
     }
 }

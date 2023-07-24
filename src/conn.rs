@@ -7,7 +7,7 @@ pub struct HttpOrHttpsConnection {
     pub(crate) kind: ConnKind,
 }
 
-pub(crate) enum ConnKind {
+pub enum ConnKind {
     Http(tokio::net::TcpStream),
     Https(tokio_rustls::server::TlsStream<tokio::net::TcpStream>),
 }
