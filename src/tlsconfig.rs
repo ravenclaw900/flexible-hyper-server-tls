@@ -77,9 +77,9 @@ fn get_tlsacceptor_from_readers(
         .with_single_cert(certs, key)?;
 
     cfg.alpn_protocols = match protocol {
-        HttpProtocol::Http1 => vec![b"http/1.1".to_vec()],
-        HttpProtocol::Http2 => vec![b"http/2".to_vec()],
-        HttpProtocol::Both => vec![b"http/2".to_vec(), b"http/1.1".to_vec()],
+        HttpProtocol::Http1 => vec![b"http/1.1".to_vec(), b"http/1.0".to_vec()],
+        HttpProtocol::Http2 => vec![b"h2".to_vec()],
+        HttpProtocol::Both => vec![b"h2".to_vec(), b"http/1.1".to_vec(), b"http/1.0".to_vec()],
     };
 
     let acceptor = tokio_rustls::TlsAcceptor::from(Arc::new(cfg));
