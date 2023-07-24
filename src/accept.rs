@@ -90,14 +90,17 @@ impl Accept for HyperHttpOrHttpsAcceptor {
                     }
                 }
                 // Unwrap is safe because encryption_future has to have been created by now
-                let encryption_future = encryption_future.as_mut().unwrap();
-                match Pin::new(&mut encryption_future.future).poll(cx) {
+                let mut encryption_future_new = encryption_future.take().unwrap();
+                match Pin::new(&mut encryption_future_new.future).poll(cx) {
                     Poll::Ready(Ok(tls_stream)) => Poll::Ready(Some(Ok(HttpOrHttpsConnection {
-                        remote_addr: encryption_future.remote_addr,
+                        remote_addr: encryption_future_new.remote_addr,
                         kind: ConnKind::Https(tls_stream),
                     }))),
                     Poll::Ready(Err(err)) => Poll::Ready(Some(Err(err))),
-                    Poll::Pending => Poll::Pending,
+                    Poll::Pending => {
+                        *encryption_future = Some(encryption_future_new);
+                        Poll::Pending
+                    }
                 }
             }
         }
