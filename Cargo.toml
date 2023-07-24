@@ -6,7 +6,6 @@ license = "MIT OR Apache-2.0"
 description = "Choose between HTTP or HTTPS when using hyper"
 
 [dependencies]
-futures = "0.3.28"
 hyper = { version = "0.14.27", features = ["server"] }
 tokio = { version = "1.29.1", features = ["net"] }
 tokio-rustls = "0.24.1"
