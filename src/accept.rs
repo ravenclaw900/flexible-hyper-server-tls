@@ -5,6 +5,7 @@ use std::task::{Context, Poll};
 
 use crate::conn::{ConnKind, HttpOrHttpsConnection};
 
+/// Choose to accept either a HTTP or HTTPS connection
 pub struct HyperHttpOrHttpsAcceptor {
     listener: tokio::net::TcpListener,
     kind: AcceptorKind,
@@ -25,6 +26,7 @@ struct HttpsEncryptionFuture {
 }
 
 impl HyperHttpOrHttpsAcceptor {
+    /// Create an acceptor that will accept HTTP connections
     pub const fn new_http(listener: tokio::net::TcpListener) -> Self {
         Self {
             listener,
@@ -32,6 +34,7 @@ impl HyperHttpOrHttpsAcceptor {
         }
     }
 
+    /// Create an acceptor that will accept HTTPS connections using the provided `TlsAcceptor`
     pub const fn new_https(
         listener: tokio::net::TcpListener,
         tls_acceptor: tokio_rustls::TlsAcceptor,

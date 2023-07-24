@@ -2,6 +2,8 @@ use std::pin::Pin;
 use std::task::{Context, Poll};
 use tokio::io::{AsyncRead, AsyncWrite};
 
+/// The stream connecting to a client over HTTP or HTTPS
+/// Yielded by `HyperHttpOrHttpsAcceptor`
 pub struct HttpOrHttpsConnection {
     pub(crate) remote_addr: std::net::SocketAddr,
     pub(crate) kind: ConnKind,
@@ -13,6 +15,7 @@ pub enum ConnKind {
 }
 
 impl HttpOrHttpsConnection {
+    /// Get the remote `SocketAddr` of the connected client
     pub const fn remote_addr(&self) -> std::net::SocketAddr {
         self.remote_addr
     }
