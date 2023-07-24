@@ -6,7 +6,7 @@ license = "MIT OR Apache-2.0"
 description = "Choose between HTTP or HTTPS when using hyper"
 
 [dependencies]
-hyper = { version = "0.14.27", features = ["server"] }
+hyper = { version = "0.14.27", features = ["server", "tcp"] }
 rustls-pemfile = "1.0.3"
 tokio = { version = "1.29.1", features = ["net"] }
 tokio-rustls = "0.24.1"
