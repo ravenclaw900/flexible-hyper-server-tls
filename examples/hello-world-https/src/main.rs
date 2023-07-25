@@ -2,6 +2,7 @@ use flexible_hyper_server_tls::*;
 use hyper::service::{make_service_fn, service_fn};
 use hyper::{Body, Request, Response, Server};
 use std::convert::Infallible;
+use std::time::Duration;
 use tokio::net::TcpListener;
 
 const CERT_DATA: &str = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/cert.pem"));
@@ -26,10 +27,10 @@ async fn main() {
         let tls_acceptor = tlsconfig::get_tlsacceptor_from_pem_data(
             CERT_DATA,
             KEY_DATA,
-            &tlsconfig::HttpProtocol::Both,
+            tlsconfig::HttpProtocol::Both,
         )
         .unwrap();
-        HyperHttpOrHttpsAcceptor::new_https(listener, tls_acceptor)
+        HyperHttpOrHttpsAcceptor::new_https(listener, tls_acceptor, Duration::from_secs(10))
     } else {
         HyperHttpOrHttpsAcceptor::new_http(listener)
     };

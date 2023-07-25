@@ -13,6 +13,7 @@ use tokio_rustls::rustls;
 ///
 /// This should match the version(s) of HTTP used to serve your application in Hyper.
 /// Using `Both` will prefer HTTP/2 over HTTP/1.1
+#[derive(Debug, Clone, Copy)]
 pub enum HttpProtocol {
     Http1,
     Http2,
@@ -27,7 +28,7 @@ pub enum HttpProtocol {
 pub fn get_tlsacceptor_from_pem_data(
     cert_data: &str,
     key_data: &str,
-    protocol: &HttpProtocol,
+    protocol: HttpProtocol,
 ) -> Result<tokio_rustls::TlsAcceptor, Box<dyn Error>> {
     let mut cert_reader = BufReader::new(Cursor::new(cert_data));
     let mut key_reader = BufReader::new(Cursor::new(key_data));
@@ -42,7 +43,7 @@ pub fn get_tlsacceptor_from_pem_data(
 pub fn get_tlsacceptor_from_files(
     cert_path: impl AsRef<Path>,
     key_path: impl AsRef<Path>,
-    protocol: &HttpProtocol,
+    protocol: HttpProtocol,
 ) -> Result<tokio_rustls::TlsAcceptor, Box<dyn Error>> {
     let cert_file = File::open(cert_path)?;
     let key_file = File::open(key_path)?;
@@ -56,7 +57,7 @@ pub fn get_tlsacceptor_from_files(
 fn get_tlsacceptor_from_readers(
     cert_reader: &mut dyn BufRead,
     key_reader: &mut dyn BufRead,
-    protocol: &HttpProtocol,
+    protocol: HttpProtocol,
 ) -> Result<tokio_rustls::TlsAcceptor, Box<dyn Error>> {
     let certs: Vec<_> = rustls_pemfile::certs(cert_reader)?
         .into_iter()

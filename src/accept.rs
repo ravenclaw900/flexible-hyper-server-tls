@@ -17,7 +17,8 @@ enum AcceptorKind {
     Http,
     Https {
         tls_acceptor: tokio_rustls::TlsAcceptor,
-        // Future has to be boxed because Rust won't let me write out the full type
+        timeout: std::time::Duration,
+        // Future has to be boxed because Rust doesn't allow writing out the full type
         // Side benefit of allow us to use Timeout without needing pin projection
         encryption_futures: FuturesUnordered<
             tokio::time::Timeout<BoxFuture<'static, Result<HttpOrHttpsConnection, std::io::Error>>>,
@@ -35,14 +36,19 @@ impl HyperHttpOrHttpsAcceptor {
     }
 
     /// Create an acceptor that will accept HTTPS connections using the provided `TlsAcceptor`
+    ///
+    /// `handshake_timeout` is the length of time that should be allowed to finish a TLS handshake before we drop the connection.
+    /// Setting it to 0 will not disable the timeout, but will instead instantly drop every connection (you probably don't want this).
     pub fn new_https(
         listener: tokio::net::TcpListener,
         tls_acceptor: tokio_rustls::TlsAcceptor,
+        handshake_timeout: std::time::Duration,
     ) -> Self {
         Self {
             listener,
             kind: AcceptorKind::Https {
                 tls_acceptor,
+                timeout: handshake_timeout,
                 encryption_futures: FuturesUnordered::new(),
             },
         }
@@ -73,6 +79,7 @@ impl Accept for HyperHttpOrHttpsAcceptor {
             // Otherwise, if it's an HTTPS connection, check if we're ready to encrypt the connection
             AcceptorKind::Https {
                 tls_acceptor,
+                timeout,
                 encryption_futures,
             } => {
                 // Accept all pending TCP connections at once (this future won't be woken up for TCP unless we get a pending here)
@@ -88,10 +95,7 @@ impl Accept for HyperHttpOrHttpsAcceptor {
                                     })
                                 })
                                 .boxed();
-                            let timed_tls_future = tokio::time::timeout(
-                                std::time::Duration::from_secs(10),
-                                tls_future,
-                            );
+                            let timed_tls_future = tokio::time::timeout(*timeout, tls_future);
                             encryption_futures.push(timed_tls_future);
                         }
                         Poll::Ready(Err(err)) => return Poll::Ready(Some(Err(err))),

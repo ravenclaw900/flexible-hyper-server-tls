@@ -3,6 +3,7 @@ use std::task::{Context, Poll};
 use tokio::io::{AsyncRead, AsyncWrite};
 
 /// The stream connecting to a client over HTTP or HTTPS
+///
 /// Yielded by `HyperHttpOrHttpsAcceptor`
 #[derive(Debug)]
 pub struct HttpOrHttpsConnection {

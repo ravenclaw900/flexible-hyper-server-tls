@@ -15,6 +15,7 @@ use hyper::service::{make_service_fn, service_fn};
 use hyper::{Body, Request, Response, Server};
 use std::convert::Infallible;
 use tokio::net::TcpListener;
+use std::time::Duration;
 
 async fn hello_world(_req: Request<Body>) -> Result<Response<Body>, Infallible> {
     Ok(Response::new("Hello, World".into()))
@@ -35,10 +36,10 @@ async fn main() {
         let tls_acceptor = tlsconfig::get_tlsacceptor_from_files(
             "./cert.cer",
             "./key.pem",
-            &tlsconfig::HttpProtocol::Http1,
+            tlsconfig::HttpProtocol::Http1,
         )
         .unwrap();
-        HyperHttpOrHttpsAcceptor::new_https(listener, tls_acceptor)
+        HyperHttpOrHttpsAcceptor::new_https(listener, tls_acceptor, Duration::from_secs(10))
     } else {
         HyperHttpOrHttpsAcceptor::new_http(listener)
     };
