@@ -4,7 +4,7 @@ A library that lets you choose whether to accept HTTPS or HTTP connections with 
 
 This library also provides some helper functions that simplify the TLS setup by using the safe defaults from Rustls.
 
-The aim of this library is to be simple and have minimal dependencies, while still allowing the user to customize things like TLS config.
+The aim of this library is to be simple and have minimal extra dependencies, while still allowing the user to customize things like TLS config.
 
 For situations where you don't need to choose between HTTP and HTTPS, check out [simple-hyper-server-tls](https://crates.io/crates/simple-hyper-server-tls) or [tls-listener](https://crates.io/crates/tls-listener).
 

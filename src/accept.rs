@@ -18,8 +18,10 @@ enum AcceptorKind {
     Https {
         tls_acceptor: tokio_rustls::TlsAcceptor,
         // Future has to be boxed because Rust won't let me write out the full type
-        encryption_futures:
-            FuturesUnordered<BoxFuture<'static, Result<HttpOrHttpsConnection, std::io::Error>>>,
+        // Side benefit of allow us to use Timeout without needing pin projection
+        encryption_futures: FuturesUnordered<
+            tokio::time::Timeout<BoxFuture<'static, Result<HttpOrHttpsConnection, std::io::Error>>>,
+        >,
     },
 }
 
@@ -73,7 +75,7 @@ impl Accept for HyperHttpOrHttpsAcceptor {
                 tls_acceptor,
                 encryption_futures,
             } => {
-                // Accept all pending TCP connections at once
+                // Accept all pending TCP connections at once (this future won't be woken up for TCP unless we get a pending here)
                 loop {
                     match this.listener.poll_accept(cx) {
                         Poll::Ready(Ok(stream)) => {
@@ -86,19 +88,27 @@ impl Accept for HyperHttpOrHttpsAcceptor {
                                     })
                                 })
                                 .boxed();
-                            encryption_futures.push(tls_future);
+                            let timed_tls_future = tokio::time::timeout(
+                                std::time::Duration::from_secs(10),
+                                tls_future,
+                            );
+                            encryption_futures.push(timed_tls_future);
                         }
                         Poll::Ready(Err(err)) => return Poll::Ready(Some(Err(err))),
                         // Break on pending here so we can check on the TLS queue
                         Poll::Pending => break,
                     }
                 }
-                // Check queue to see if any handshakes are done
-                match encryption_futures.poll_next_unpin(cx) {
-                    // Already `map`ed to a Result<HttpOrHttpsConnection>, so no need to differentiate
-                    // between Some(Err) and Some(Ok)
-                    Poll::Ready(Some(res)) => Poll::Ready(Some(res)),
-                    _ => Poll::Pending,
+                // Check queue to see if any handshakes are done/timeouts hit
+                loop {
+                    match encryption_futures.poll_next_unpin(cx) {
+                        // Already `map`ed to a Result<HttpOrHttpsConnection>, so no need to differentiate
+                        // between Some(Err) and Some(Ok)
+                        Poll::Ready(Some(Ok(res))) => return Poll::Ready(Some(res)),
+                        // An error here means that the timeout ran out, so just skip to the next one in the queue
+                        Poll::Ready(Some(Err(_))) => continue,
+                        _ => return Poll::Pending,
+                    }
                 }
             }
         }
