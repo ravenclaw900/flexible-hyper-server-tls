@@ -5,14 +5,14 @@ use std::convert::Infallible;
 use std::time::Duration;
 use tokio::net::TcpListener;
 
-const CERT_DATA: &str = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/cert.pem"));
-const KEY_DATA: &str = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/key.pem"));
+const CERT_DATA: &str = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/examples/certs/cert.pem"));
+const KEY_DATA: &str = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/examples/certs/key.pem"));
 
 async fn hello_world(_req: Request<Body>) -> Result<Response<Body>, Infallible> {
     Ok(Response::new("Hello, World".into()))
 }
 
-#[tokio::main]
+#[tokio::main(flavor = "current_thread")]
 async fn main() {
     let use_tls = true;
 
