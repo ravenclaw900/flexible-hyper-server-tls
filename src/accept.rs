@@ -1,5 +1,7 @@
+use futures_util::future::BoxFuture;
+use futures_util::stream::FuturesUnordered;
+use futures_util::{FutureExt, StreamExt};
 use hyper::server::accept::Accept;
-use std::future::Future;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
@@ -15,14 +17,10 @@ enum AcceptorKind {
     Http,
     Https {
         tls_acceptor: tokio_rustls::TlsAcceptor,
-        encryption_future: Option<HttpsEncryptionFuture>,
+        // Future has to be boxed because Rust won't let me write out the full type
+        encryption_futures:
+            FuturesUnordered<BoxFuture<'static, Result<HttpOrHttpsConnection, std::io::Error>>>,
     },
-}
-
-struct HttpsEncryptionFuture {
-    future: tokio_rustls::Accept<tokio::net::TcpStream>,
-    // Only the HTTPS side needs to store the remote address, HTTP can just return it immediately
-    remote_addr: std::net::SocketAddr,
 }
 
 impl HyperHttpOrHttpsAcceptor {
@@ -35,7 +33,7 @@ impl HyperHttpOrHttpsAcceptor {
     }
 
     /// Create an acceptor that will accept HTTPS connections using the provided `TlsAcceptor`
-    pub const fn new_https(
+    pub fn new_https(
         listener: tokio::net::TcpListener,
         tls_acceptor: tokio_rustls::TlsAcceptor,
     ) -> Self {
@@ -43,7 +41,7 @@ impl HyperHttpOrHttpsAcceptor {
             listener,
             kind: AcceptorKind::Https {
                 tls_acceptor,
-                encryption_future: None,
+                encryption_futures: FuturesUnordered::new(),
             },
         }
     }
@@ -71,36 +69,36 @@ impl Accept for HyperHttpOrHttpsAcceptor {
                 Poll::Pending => Poll::Pending,
             },
             // Otherwise, if it's an HTTPS connection, check if we're ready to encrypt the connection
-            // Weird control flow here (if then another if) to avoid returning an unnecessary Poll::Pending
             AcceptorKind::Https {
                 tls_acceptor,
-                encryption_future,
+                encryption_futures,
             } => {
-                // Will be skipped if going through a second time, as accept_future will have already been stored
-                if encryption_future.is_none() {
+                // Accept all pending TCP connections at once
+                loop {
                     match this.listener.poll_accept(cx) {
                         Poll::Ready(Ok(stream)) => {
-                            *encryption_future = Some(HttpsEncryptionFuture {
-                                future: tls_acceptor.accept(stream.0),
-                                remote_addr: stream.1,
-                            });
+                            let tls_future = tls_acceptor
+                                .accept(stream.0)
+                                .map(move |f| {
+                                    f.map(|conn| HttpOrHttpsConnection {
+                                        remote_addr: stream.1,
+                                        kind: ConnKind::Https(conn),
+                                    })
+                                })
+                                .boxed();
+                            encryption_futures.push(tls_future);
                         }
                         Poll::Ready(Err(err)) => return Poll::Ready(Some(Err(err))),
-                        Poll::Pending => return Poll::Pending,
+                        // Break on pending here so we can check on the TLS queue
+                        Poll::Pending => break,
                     }
                 }
-                // Unwrap is safe because encryption_future has to have been created by now
-                let mut encryption_future_new = encryption_future.take().unwrap();
-                match Pin::new(&mut encryption_future_new.future).poll(cx) {
-                    Poll::Ready(Ok(tls_stream)) => Poll::Ready(Some(Ok(HttpOrHttpsConnection {
-                        remote_addr: encryption_future_new.remote_addr,
-                        kind: ConnKind::Https(tls_stream),
-                    }))),
-                    Poll::Ready(Err(err)) => Poll::Ready(Some(Err(err))),
-                    Poll::Pending => {
-                        *encryption_future = Some(encryption_future_new);
-                        Poll::Pending
-                    }
+                // Check queue to see if any handshakes are done
+                match encryption_futures.poll_next_unpin(cx) {
+                    // Already `map`ed to a Result<HttpOrHttpsConnection>, so no need to differentiate
+                    // between Some(Err) and Some(Ok)
+                    Poll::Ready(Some(res)) => Poll::Ready(Some(res)),
+                    _ => Poll::Pending,
                 }
             }
         }

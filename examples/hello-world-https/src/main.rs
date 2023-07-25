@@ -13,7 +13,7 @@ async fn hello_world(_req: Request<Body>) -> Result<Response<Body>, Infallible> 
 
 #[tokio::main]
 async fn main() {
-    let use_tls = false;
+    let use_tls = true;
 
     let listener = TcpListener::bind("127.0.0.1:8080").await.unwrap();
 
@@ -34,7 +34,10 @@ async fn main() {
         HyperHttpOrHttpsAcceptor::new_http(listener)
     };
 
-    let server = Server::builder(acceptor).serve(make_svc);
+    let mut server = Server::builder(acceptor).serve(make_svc);
 
-    server.await.unwrap();
+    loop {
+        let res = (&mut server).await;
+        eprintln!("Error: {:?}", res);
+    }
 }

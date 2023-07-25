@@ -4,11 +4,13 @@ use tokio::io::{AsyncRead, AsyncWrite};
 
 /// The stream connecting to a client over HTTP or HTTPS
 /// Yielded by `HyperHttpOrHttpsAcceptor`
+#[derive(Debug)]
 pub struct HttpOrHttpsConnection {
     pub(crate) remote_addr: std::net::SocketAddr,
     pub(crate) kind: ConnKind,
 }
 
+#[derive(Debug)]
 pub enum ConnKind {
     Http(tokio::net::TcpStream),
     Https(tokio_rustls::server::TlsStream<tokio::net::TcpStream>),
