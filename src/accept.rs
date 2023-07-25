@@ -4,6 +4,7 @@ use futures_util::{FutureExt, StreamExt};
 use hyper::server::accept::Accept;
 use std::pin::Pin;
 use std::task::{Context, Poll};
+use thiserror::Error;
 
 use crate::conn::{ConnKind, HttpOrHttpsConnection};
 
@@ -21,7 +22,7 @@ enum AcceptorKind {
         // Future has to be boxed because Rust doesn't allow writing out the full type
         // Side benefit of allow us to use Timeout without needing pin projection
         encryption_futures: FuturesUnordered<
-            tokio::time::Timeout<BoxFuture<'static, Result<HttpOrHttpsConnection, std::io::Error>>>,
+            tokio::time::Timeout<BoxFuture<'static, Result<HttpOrHttpsConnection, AcceptorError>>>,
         >,
     },
 }
@@ -55,9 +56,20 @@ impl HyperHttpOrHttpsAcceptor {
     }
 }
 
+/// Error when accepting connections
+#[derive(Error, Debug)]
+pub enum AcceptorError {
+    /// Failed to connect to client over TCP
+    #[error("TCP connection to client failed")]
+    TcpConnect(#[source] std::io::Error),
+    /// Failed to make TLS handshake with client
+    #[error("TLS handshake with client failed")]
+    TlsHandshake(#[source] std::io::Error),
+}
+
 impl Accept for HyperHttpOrHttpsAcceptor {
     type Conn = HttpOrHttpsConnection;
-    type Error = std::io::Error;
+    type Error = AcceptorError;
 
     fn poll_accept(
         self: Pin<&mut Self>,
@@ -73,7 +85,7 @@ impl Accept for HyperHttpOrHttpsAcceptor {
                     remote_addr: stream.1,
                     kind: ConnKind::Http(stream.0),
                 }))),
-                Poll::Ready(Err(err)) => Poll::Ready(Some(Err(err))),
+                Poll::Ready(Err(err)) => Poll::Ready(Some(Err(AcceptorError::TcpConnect(err)))),
                 Poll::Pending => Poll::Pending,
             },
             // Otherwise, if it's an HTTPS connection, check if we're ready to encrypt the connection
@@ -89,16 +101,20 @@ impl Accept for HyperHttpOrHttpsAcceptor {
                             let tls_future = tls_acceptor
                                 .accept(stream.0)
                                 .map(move |f| {
+                                    // Map so that we can pass along the remote address
                                     f.map(|conn| HttpOrHttpsConnection {
                                         remote_addr: stream.1,
                                         kind: ConnKind::Https(conn),
                                     })
+                                    .map_err(AcceptorError::TlsHandshake)
                                 })
                                 .boxed();
                             let timed_tls_future = tokio::time::timeout(*timeout, tls_future);
                             encryption_futures.push(timed_tls_future);
                         }
-                        Poll::Ready(Err(err)) => return Poll::Ready(Some(Err(err))),
+                        Poll::Ready(Err(err)) => {
+                            return Poll::Ready(Some(Err(AcceptorError::TcpConnect(err))))
+                        }
                         // Break on pending here so we can check on the TLS queue
                         Poll::Pending => break,
                     }

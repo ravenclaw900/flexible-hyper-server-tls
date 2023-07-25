@@ -9,6 +9,7 @@ description = "Choose between HTTP or HTTPS when using hyper"
 futures-util = "0.3.28"
 hyper = { version = "0.14.27", features = ["server", "tcp"] }
 rustls-pemfile = "1.0.3"
+thiserror = "1.0.44"
 tokio = { version = "1.29.1", features = ["net", "time"] }
 tokio-rustls = "0.24.1"
 

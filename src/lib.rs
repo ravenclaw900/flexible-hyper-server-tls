@@ -51,5 +51,5 @@ mod conn;
 pub mod tlsconfig;
 
 // Export into main library
-pub use accept::HyperHttpOrHttpsAcceptor;
+pub use accept::{AcceptorError, HyperHttpOrHttpsAcceptor};
 pub use conn::HttpOrHttpsConnection;

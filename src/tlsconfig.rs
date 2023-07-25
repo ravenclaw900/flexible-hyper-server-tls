@@ -2,12 +2,32 @@
 //!
 //! These functions use safe defaults from rustls to generate the `TlsAcceptor`, but it is not necessary to use them.
 
-use std::error::Error;
 use std::fs::File;
 use std::io::{BufRead, BufReader, Cursor};
 use std::path::Path;
 use std::sync::Arc;
+use thiserror::Error;
 use tokio_rustls::rustls;
+
+/// Error when creating a `TlsAcceptor`
+#[derive(Error, Debug)]
+pub enum TlsAcceptorError {
+    /// No valid PEM data was provided
+    #[error("no valid pem data")]
+    NoValidPem,
+    /// There were no private keys in the provided PEM data
+    #[error("no valid private keys in pem data")]
+    NoValidKey,
+    /// Rustls failed to create the `ServerConfig`
+    #[error("failed to create ServerConfig")]
+    ServerConfig(#[from] rustls::Error),
+    /// Failed to open a PEM file
+    #[error("failed to open pem file")]
+    FileOpen(#[source] std::io::Error),
+    /// General IO errors
+    #[error(transparent)]
+    Io(#[from] std::io::Error),
+}
 
 /// The HTTP protocol to use when clients are connecting.
 ///
@@ -29,7 +49,7 @@ pub fn get_tlsacceptor_from_pem_data(
     cert_data: &str,
     key_data: &str,
     protocol: HttpProtocol,
-) -> Result<tokio_rustls::TlsAcceptor, Box<dyn Error>> {
+) -> Result<tokio_rustls::TlsAcceptor, TlsAcceptorError> {
     let mut cert_reader = BufReader::new(Cursor::new(cert_data));
     let mut key_reader = BufReader::new(Cursor::new(key_data));
     get_tlsacceptor_from_readers(&mut cert_reader, &mut key_reader, protocol)
@@ -44,9 +64,9 @@ pub fn get_tlsacceptor_from_files(
     cert_path: impl AsRef<Path>,
     key_path: impl AsRef<Path>,
     protocol: HttpProtocol,
-) -> Result<tokio_rustls::TlsAcceptor, Box<dyn Error>> {
-    let cert_file = File::open(cert_path)?;
-    let key_file = File::open(key_path)?;
+) -> Result<tokio_rustls::TlsAcceptor, TlsAcceptorError> {
+    let cert_file = File::open(cert_path).map_err(TlsAcceptorError::FileOpen)?;
+    let key_file = File::open(key_path).map_err(TlsAcceptorError::FileOpen)?;
 
     let mut cert_reader = BufReader::new(cert_file);
     let mut key_reader = BufReader::new(key_file);
@@ -58,18 +78,18 @@ fn get_tlsacceptor_from_readers(
     cert_reader: &mut dyn BufRead,
     key_reader: &mut dyn BufRead,
     protocol: HttpProtocol,
-) -> Result<tokio_rustls::TlsAcceptor, Box<dyn Error>> {
+) -> Result<tokio_rustls::TlsAcceptor, TlsAcceptorError> {
     let certs: Vec<_> = rustls_pemfile::certs(cert_reader)?
         .into_iter()
         .map(rustls::Certificate)
         .collect();
 
-    let key = rustls_pemfile::read_one(key_reader)?.ok_or("no valid pem data in key data")?;
+    let key = rustls_pemfile::read_one(key_reader)?.ok_or(TlsAcceptorError::NoValidPem)?;
     let key = match key {
         rustls_pemfile::Item::ECKey(data)
         | rustls_pemfile::Item::RSAKey(data)
         | rustls_pemfile::Item::PKCS8Key(data) => rustls::PrivateKey(data),
-        _ => return Err("no private key in key data".into()),
+        _ => return Err(TlsAcceptorError::NoValidKey),
     };
 
     let mut cfg = rustls::server::ServerConfig::builder()
