@@ -7,6 +7,7 @@ description = "Choose between HTTP or HTTPS when using hyper"
 repository = "https://github.com/ravenclaw900/flexible-hyper-server-tls"
 keywords = ["hyper", "tls", "http", "https", "rustls"]
 categories = ["network-programming"]
+exclude = ["examples/certs"]
 
 [dependencies]
 futures-util = "0.3.28"
