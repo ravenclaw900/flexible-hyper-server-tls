@@ -1,9 +1,9 @@
 [package]
 name = "flexible-hyper-server-tls"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 license = "MIT OR Apache-2.0"
-description = "Choose between HTTP or HTTPS when using hyper"
+description = "Easily choose between HTTP or HTTPS when using hyper"
 repository = "https://github.com/ravenclaw900/flexible-hyper-server-tls"
 keywords = ["hyper", "tls", "http", "https", "rustls"]
 categories = ["network-programming"]
