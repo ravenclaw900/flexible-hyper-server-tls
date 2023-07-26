@@ -10,7 +10,7 @@ categories = ["network-programming"]
 exclude = ["examples/certs"]
 
 [dependencies]
-futures-util = "0.3.28"
+futures-util = { version = "0.3.28", default-features = false, features = ["std"] }
 hyper = { version = "0.14.27", features = ["server", "tcp"] }
 rustls-pemfile = "1.0.3"
 thiserror = "1.0.44"
