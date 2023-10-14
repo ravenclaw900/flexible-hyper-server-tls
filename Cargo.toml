@@ -15,7 +15,7 @@ hyper = { version = "0.14.27", features = ["server", "tcp"] }
 rustls-pemfile = "1.0.3"
 thiserror = "1.0.44"
 tokio = { version = "1.29.1", features = ["net", "time"] }
-tokio-rustls = "0.24.1"
+tokio-rustls = "0.25.0-alpha.1"
 
 [dev-dependencies]
 hyper = { version = "0.14.27", features = ["http1", "http2"] }
