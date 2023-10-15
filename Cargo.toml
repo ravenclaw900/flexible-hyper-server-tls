@@ -12,7 +12,7 @@ exclude = ["examples/certs"]
 [dependencies]
 futures-util = { version = "0.3.28", default-features = false, features = ["std"] }
 hyper = { version = "0.14.27", features = ["server", "tcp"] }
-rustls-pemfile = "1.0.3"
+rustls-pemfile = "2.0.0-alpha.1"
 thiserror = "1.0.44"
 tokio = { version = "1.29.1", features = ["net", "time"] }
 tokio-rustls = "0.25.0-alpha.1"

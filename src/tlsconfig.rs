@@ -79,16 +79,15 @@ fn get_tlsacceptor_from_readers(
     key_reader: &mut dyn BufRead,
     protocol: HttpProtocol,
 ) -> Result<tokio_rustls::TlsAcceptor, TlsAcceptorError> {
-    let certs: Vec<_> = rustls_pemfile::certs(cert_reader)?
-        .into_iter()
-        .map(rustls::Certificate)
+    let certs: Vec<_> = rustls_pemfile::certs(cert_reader)
+        .filter_map(Result::ok)
         .collect();
 
     let key = rustls_pemfile::read_one(key_reader)?.ok_or(TlsAcceptorError::NoValidPem)?;
     let key = match key {
-        rustls_pemfile::Item::ECKey(data)
-        | rustls_pemfile::Item::RSAKey(data)
-        | rustls_pemfile::Item::PKCS8Key(data) => rustls::PrivateKey(data),
+        rustls_pemfile::Item::Sec1Key(data) => data.into(),
+        rustls_pemfile::Item::Pkcs1Key(data) => data.into(),
+        rustls_pemfile::Item::Pkcs8Key(data) => data.into(),
         _ => return Err(TlsAcceptorError::NoValidKey),
     };
 
