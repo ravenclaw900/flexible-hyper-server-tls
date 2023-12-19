@@ -1,6 +1,6 @@
 [package]
 name = "flexible-hyper-server-tls"
-version = "0.1.2-alpha.1"
+version = "0.1.2"
 edition = "2021"
 license = "MIT OR Apache-2.0"
 description = "Easily choose between HTTP or HTTPS when using hyper"
@@ -11,13 +11,12 @@ exclude = ["examples/certs"]
 
 [dependencies]
 futures-util = { version = "0.3.28", default-features = false, features = ["std"] }
-hyper = { version = "0.14.27", features = ["server", "tcp"] }
-rustls-pemfile = "2.0.0-alpha.1"
-thiserror = "1.0.44"
-tokio = { version = "1.29.1", features = ["net", "time"] }
-tokio-rustls = "0.25.0-alpha.1"
+hyper = { version = "0.14.28", features = ["server", "tcp"] }
+rustls-pemfile = "2.0.0"
+thiserror = "1.0.51"
+tokio = { version = "1.35.1", features = ["net", "time"] }
+tokio-rustls = "0.25.0"
 
 [dev-dependencies]
-hyper = { version = "0.14.27", features = ["http1", "http2"] }
-tokio = { version = "1.29.1", features = ["rt", "macros"] }
-
+hyper = { version = "0.14.28", features = ["http1", "http2"] }
+tokio = { version = "1.35.1", features = ["rt", "macros"] }
