@@ -92,7 +92,6 @@ fn get_tlsacceptor_from_readers(
     };
 
     let mut cfg = rustls::server::ServerConfig::builder()
-        .with_safe_defaults()
         .with_no_client_auth()
         .with_single_cert(certs, key)?;
 
