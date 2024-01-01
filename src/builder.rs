@@ -12,6 +12,9 @@ pub struct Https {
     timeout: Duration,
 }
 
+/// Build an `HttpOrHttpsAcceptor`
+///
+/// Defaults to accepting HTTP connections, call the `https` method to accept HTTPS connections instead
 pub struct AcceptorBuilder<State> {
     state: State,
     listener: TcpListener,

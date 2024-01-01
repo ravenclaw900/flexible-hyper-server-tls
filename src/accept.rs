@@ -4,6 +4,8 @@ use std::net::SocketAddr;
 use thiserror::Error;
 
 /// Choose to accept either a HTTP or HTTPS connection
+///
+/// Created by calling the `build` method on an `AcceptorBuilder`
 // Use a struct instead of the enum directly to avoid users constructing/matching on enum variants
 pub struct HttpOrHttpsAcceptor(pub(crate) AcceptorInner);
 
@@ -13,6 +15,8 @@ pub enum AcceptorInner {
 }
 
 impl HttpOrHttpsAcceptor {
+    /// Accepts every connection using the service provided, never completes.
+    /// Ignores any connection errors produced by the `accept` method.
     pub async fn serve<S>(&mut self, service: S)
     where
         S: hyper::service::HttpService<hyper::body::Incoming> + Clone + Send + 'static,
@@ -27,6 +31,13 @@ impl HttpOrHttpsAcceptor {
         }
     }
 
+    /// Accepts a singular connection and spawns it onto the tokio runtime.
+    /// Returns the address of the connected client.
+    ///
+    /// # Errors
+    /// If the TCP connection or TLS handshake (HTTPS only) fails
+    // Function won't panic, however tokio worker might
+    #[allow(clippy::missing_panics_doc)]
     pub async fn accept<S>(&mut self, service: S) -> Result<SocketAddr, AcceptorError>
     where
         S: hyper::service::HttpService<hyper::body::Incoming> + Send + 'static,

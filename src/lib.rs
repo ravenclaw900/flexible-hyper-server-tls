@@ -3,6 +3,7 @@
 
 //! This library lets you easily create a Hyper acceptor that be configured to either accept HTTP or HTTPS connections.
 //! This is useful for applications that users will self-host, and have the option to run as HTTP or provide their own HTTPS certificates.
+//! At the moment, this library only supports accepting HTTP/1 connections
 //! **Note: HTTP and HTTPS cannot be accepted at the same time, you decide which one to use when creating the acceptor.**
 //! ## Example
 //! ```
@@ -18,7 +19,7 @@
 //!     Ok(Response::new(Full::<Bytes>::from("Hello, World!")))
 //! }
 //!
-//! #[tokio::main(flavor = "current_thread")]
+//! #[tokio::main]
 //! async fn main() {
 //!     let use_tls = true;
 //!
@@ -34,10 +35,7 @@
 //!         builder.build()
 //!     };
 //!
-//!     loop {
-//!         let peer_addr = acceptor.accept(service_fn(hello_world)).await.unwrap();
-//!         println!("Connected peer: {}", peer_addr)
-//!     }
+//!     acceptor.serve(service_fn(hello_world)).await;
 //! }
 //! ```
 

@@ -29,7 +29,7 @@ pub enum TlsAcceptorError {
     Io(#[from] std::io::Error),
 }
 
-// Only HTTP 1 is supported at the moment
+// Only HTTP/1 is supported at the moment
 
 // /// The HTTP protocol to use when clients are connecting.
 // ///
