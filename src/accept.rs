@@ -4,7 +4,10 @@ use std::net::SocketAddr;
 use thiserror::Error;
 
 /// Choose to accept either a HTTP or HTTPS connection
-pub enum HttpOrHttpsAcceptor {
+// Use a struct instead of the enum directly to avoid users constructing/matching on enum variants
+pub struct HttpOrHttpsAcceptor(AcceptorInner);
+
+enum AcceptorInner {
     Http(tokio::net::TcpListener),
     Https(tls_listener::TlsListener<tokio::net::TcpListener, tokio_rustls::TlsAcceptor>),
 }
@@ -20,8 +23,8 @@ impl HttpOrHttpsAcceptor {
     {
         let conn_builder = http1::Builder::new();
 
-        match self {
-            Self::Http(listener) => {
+        match &mut self.0 {
+            AcceptorInner::Http(listener) => {
                 let (conn, peer_addr) =
                     listener.accept().await.map_err(AcceptorError::TcpConnect)?;
 
@@ -33,7 +36,7 @@ impl HttpOrHttpsAcceptor {
 
                 Ok(peer_addr)
             }
-            Self::Https(listener) => {
+            AcceptorInner::Https(listener) => {
                 let (conn, peer_addr) = loop {
                     match listener.accept().await {
                         Err(tls_listener::Error::ListenerError(e)) => {
