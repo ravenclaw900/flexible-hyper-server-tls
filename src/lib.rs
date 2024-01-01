@@ -3,18 +3,20 @@
 
 //! This library lets you easily create a Hyper acceptor that be configured to either accept HTTP or HTTPS connections.
 //! This is useful for applications that users will self-host, and have the option to run as HTTP or provide their own HTTPS certificates.
+//! At the moment, this library only supports accepting HTTP/1 connections
 //! **Note: HTTP and HTTPS cannot be accepted at the same time, you decide which one to use when creating the acceptor.**
 //! ## Example
 //! ```
 //! use flexible_hyper_server_tls::*;
-//! use hyper::service::{make_service_fn, service_fn};
-//! use hyper::{Body, Request, Response, Server};
+//! use http_body_util::Full;
+//! use hyper::body::{Bytes, Incoming};
+//! use hyper::service::service_fn;
+//! use hyper::{Request, Response};
 //! use std::convert::Infallible;
 //! use tokio::net::TcpListener;
-//! use std::time::Duration;
 //!
-//! async fn hello_world(_req: Request<Body>) -> Result<Response<Body>, Infallible> {
-//!     Ok(Response::new("Hello, World".into()))
+//! async fn hello_world(_req: Request<Incoming>) -> Result<Response<Full<Bytes>>, Infallible> {
+//!     Ok(Response::new(Full::<Bytes>::from("Hello, World!")))
 //! }
 //!
 //! #[tokio::main]
@@ -23,33 +25,25 @@
 //!
 //!     let listener = TcpListener::bind("127.0.0.1:8080").await.unwrap();
 //!
-//!     let make_svc = make_service_fn(|conn: &HttpOrHttpsConnection| {
-//!         println!("Remote address: {}", conn.remote_addr());
-//!         async { Ok::<_, Infallible>(service_fn(hello_world)) }
-//!     });
+//!     let builder = AcceptorBuilder::new(listener);
 //!
-//!     let acceptor = if use_tls {
-//!         let tls_acceptor = tlsconfig::get_tlsacceptor_from_files(
-//!             "./cert.cer",
-//!             "./key.pem",
-//!             tlsconfig::HttpProtocol::Both,
-//!         )
-//!         .unwrap();
-//!         HyperHttpOrHttpsAcceptor::new_https(listener, tls_acceptor, Duration::from_secs(10))
+//!     let mut acceptor = if use_tls {
+//!         let tls_acceptor =
+//!             rustls_helpers::get_tlsacceptor_from_files("./cert.cer", "./key.pem").unwrap();
+//!         builder.https(tls_acceptor).build()
 //!     } else {
-//!         HyperHttpOrHttpsAcceptor::new_http(listener)
+//!         builder.build()
 //!     };
 //!
-//!     let server = Server::builder(acceptor).serve(make_svc);
-//!
-//!     server.await.unwrap();
+//!     acceptor.serve(service_fn(hello_world)).await;
 //! }
 //! ```
 
 mod accept;
-mod conn;
-pub mod tlsconfig;
+mod builder;
+#[cfg(feature = "rustls_helpers")]
+pub mod rustls_helpers;
 
 // Export into main library
-pub use accept::{AcceptorError, HyperHttpOrHttpsAcceptor};
-pub use conn::HttpOrHttpsConnection;
+pub use accept::{AcceptorError, HttpOrHttpsAcceptor};
+pub use builder::AcceptorBuilder;

@@ -1,57 +1,89 @@
-use futures_util::future::BoxFuture;
-use futures_util::stream::FuturesUnordered;
-use futures_util::{FutureExt, StreamExt};
-use hyper::server::accept::Accept;
-use std::pin::Pin;
-use std::task::{Context, Poll};
+use hyper::server::conn::http1;
+use hyper_util::rt::TokioIo;
+use std::net::SocketAddr;
 use thiserror::Error;
 
-use crate::conn::{ConnKind, HttpOrHttpsConnection};
-
 /// Choose to accept either a HTTP or HTTPS connection
-pub struct HyperHttpOrHttpsAcceptor {
-    listener: tokio::net::TcpListener,
-    kind: AcceptorKind,
+///
+/// Created by calling the `build` method on an `AcceptorBuilder`
+// Use a struct instead of the enum directly to avoid users constructing/matching on enum variants
+pub struct HttpOrHttpsAcceptor(pub(crate) AcceptorInner);
+
+pub enum AcceptorInner {
+    Http(tokio::net::TcpListener),
+    Https(tls_listener::TlsListener<tokio::net::TcpListener, tokio_rustls::TlsAcceptor>),
 }
 
-enum AcceptorKind {
-    Http,
-    Https {
-        tls_acceptor: tokio_rustls::TlsAcceptor,
-        timeout: std::time::Duration,
-        // Future has to be boxed because Rust doesn't allow writing out the full type
-        // Side benefit of allow us to use Timeout without needing pin projection
-        encryption_futures: FuturesUnordered<
-            tokio::time::Timeout<BoxFuture<'static, Result<HttpOrHttpsConnection, AcceptorError>>>,
-        >,
-    },
-}
-
-impl HyperHttpOrHttpsAcceptor {
-    /// Create an acceptor that will accept HTTP connections
-    pub const fn new_http(listener: tokio::net::TcpListener) -> Self {
-        Self {
-            listener,
-            kind: AcceptorKind::Http,
+impl HttpOrHttpsAcceptor {
+    /// Accepts every connection using the service provided, never completes.
+    /// Ignores any connection errors produced by the `accept` method.
+    pub async fn serve<S>(&mut self, service: S)
+    where
+        S: hyper::service::HttpService<hyper::body::Incoming> + Clone + Send + 'static,
+        S::Future: Send,
+        S::ResBody: Send + 'static,
+        <S::ResBody as hyper::body::Body>::Error: std::error::Error + Send + Sync + 'static,
+        <S::ResBody as hyper::body::Body>::Data: Send,
+    {
+        loop {
+            // Ignore result here
+            let _ = self.accept(service.clone()).await;
         }
     }
 
-    /// Create an acceptor that will accept HTTPS connections using the provided `TlsAcceptor`
+    /// Accepts a singular connection and spawns it onto the tokio runtime.
+    /// Returns the address of the connected client.
     ///
-    /// `handshake_timeout` is the length of time that should be allowed to finish a TLS handshake before we drop the connection.
-    /// Setting it to 0 will not disable the timeout, but will instead instantly drop every connection (you probably don't want this).
-    pub fn new_https(
-        listener: tokio::net::TcpListener,
-        tls_acceptor: tokio_rustls::TlsAcceptor,
-        handshake_timeout: std::time::Duration,
-    ) -> Self {
-        Self {
-            listener,
-            kind: AcceptorKind::Https {
-                tls_acceptor,
-                timeout: handshake_timeout,
-                encryption_futures: FuturesUnordered::new(),
-            },
+    /// # Errors
+    /// If the TCP connection or TLS handshake (HTTPS only) fails
+    // Function won't panic, however tokio worker might
+    #[allow(clippy::missing_panics_doc)]
+    pub async fn accept<S>(&mut self, service: S) -> Result<SocketAddr, AcceptorError>
+    where
+        S: hyper::service::HttpService<hyper::body::Incoming> + Send + 'static,
+        S::Future: Send,
+        S::ResBody: Send + 'static,
+        <S::ResBody as hyper::body::Body>::Error: std::error::Error + Send + Sync + 'static,
+        <S::ResBody as hyper::body::Body>::Data: Send,
+    {
+        let conn_builder = http1::Builder::new();
+
+        match &mut self.0 {
+            AcceptorInner::Http(listener) => {
+                let (conn, peer_addr) =
+                    listener.accept().await.map_err(AcceptorError::TcpConnect)?;
+
+                let conn = TokioIo::new(conn);
+
+                let conn = conn_builder.serve_connection(conn, service);
+
+                tokio::spawn(async move { conn.await.unwrap() });
+
+                Ok(peer_addr)
+            }
+            AcceptorInner::Https(listener) => {
+                let (conn, peer_addr) = loop {
+                    match listener.accept().await {
+                        Err(tls_listener::Error::ListenerError(e)) => {
+                            return Err(AcceptorError::TcpConnect(e))
+                        }
+                        Err(tls_listener::Error::TlsAcceptError { error, .. }) => {
+                            return Err(AcceptorError::TcpConnect(error))
+                        }
+                        // Ignore handshake timeout errors, just try to get another connection
+                        Err(_) => continue,
+                        Ok(conn_and_addr) => break conn_and_addr,
+                    }
+                };
+
+                let conn = TokioIo::new(conn);
+
+                let conn = conn_builder.serve_connection(conn, service);
+
+                tokio::spawn(async move { conn.await.unwrap() });
+
+                Ok(peer_addr)
+            }
         }
     }
 }
@@ -65,72 +97,4 @@ pub enum AcceptorError {
     /// Failed to make TLS handshake with client
     #[error("TLS handshake with client failed")]
     TlsHandshake(#[source] std::io::Error),
-}
-
-impl Accept for HyperHttpOrHttpsAcceptor {
-    type Conn = HttpOrHttpsConnection;
-    type Error = AcceptorError;
-
-    fn poll_accept(
-        self: Pin<&mut Self>,
-        cx: &mut Context<'_>,
-    ) -> Poll<Option<Result<Self::Conn, Self::Error>>> {
-        // Necessary to allow partial borrows
-        let this = self.get_mut();
-
-        match &mut this.kind {
-            // If just a normal HTTP connection, just poll to accept the new TCP connection
-            AcceptorKind::Http => match this.listener.poll_accept(cx) {
-                Poll::Ready(Ok(stream)) => Poll::Ready(Some(Ok(HttpOrHttpsConnection {
-                    remote_addr: stream.1,
-                    kind: ConnKind::Http(stream.0),
-                }))),
-                Poll::Ready(Err(err)) => Poll::Ready(Some(Err(AcceptorError::TcpConnect(err)))),
-                Poll::Pending => Poll::Pending,
-            },
-            // Otherwise, if it's an HTTPS connection, check if we're ready to encrypt the connection
-            AcceptorKind::Https {
-                tls_acceptor,
-                timeout,
-                encryption_futures,
-            } => {
-                // Accept all pending TCP connections at once (this future won't be woken up for TCP unless we get a pending here)
-                loop {
-                    match this.listener.poll_accept(cx) {
-                        Poll::Ready(Ok(stream)) => {
-                            let tls_future = tls_acceptor
-                                .accept(stream.0)
-                                .map(move |f| {
-                                    // Map so that we can pass along the remote address
-                                    f.map(|conn| HttpOrHttpsConnection {
-                                        remote_addr: stream.1,
-                                        kind: ConnKind::Https(conn),
-                                    })
-                                    .map_err(AcceptorError::TlsHandshake)
-                                })
-                                .boxed();
-                            let timed_tls_future = tokio::time::timeout(*timeout, tls_future);
-                            encryption_futures.push(timed_tls_future);
-                        }
-                        Poll::Ready(Err(err)) => {
-                            return Poll::Ready(Some(Err(AcceptorError::TcpConnect(err))))
-                        }
-                        // Break on pending here so we can check on the TLS queue
-                        Poll::Pending => break,
-                    }
-                }
-                // Check queue to see if any handshakes are done/timeouts hit
-                loop {
-                    match encryption_futures.poll_next_unpin(cx) {
-                        // Already `map`ed to a Result<HttpOrHttpsConnection>, so no need to differentiate
-                        // between Some(Err) and Some(Ok)
-                        Poll::Ready(Some(Ok(res))) => return Poll::Ready(Some(res)),
-                        // An error here means that the timeout ran out, so just skip to the next one in the queue
-                        Poll::Ready(Some(Err(_))) => continue,
-                        _ => return Poll::Pending,
-                    }
-                }
-            }
-        }
-    }
 }

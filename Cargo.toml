@@ -9,14 +9,21 @@ keywords = ["hyper", "tls", "http", "https", "rustls"]
 categories = ["network-programming"]
 exclude = ["examples/certs"]
 
+[features]
+default = ["rustls_helpers"]
+rustls_helpers = ["dep:rustls-pemfile"]
+
 [dependencies]
-futures-util = { version = "0.3.28", default-features = false, features = ["std"] }
-hyper = { version = "0.14.28", features = ["server", "tcp"] }
-rustls-pemfile = "2.0.0"
-thiserror = "1.0.51"
+# Will figure out how to handle http1 vs. http2 later
+hyper = { version = "1.1.0", features = ["server", "http1"] }
+hyper-util = { version = "0.1.2", features = ["tokio"] }
+rustls-pemfile = { version = "2.0.0", optional = true }
+thiserror = "1.0.52"
+tls-listener = { version = "0.9.1", features = ["rustls"] }
 tokio = { version = "1.35.1", features = ["net", "time"] }
 tokio-rustls = "0.25.0"
 
 [dev-dependencies]
-hyper = { version = "0.14.28", features = ["http1", "http2"] }
+http-body-util = "0.1.0"
+hyper = { version = "1.1.0", features = ["http1"] }
 tokio = { version = "1.35.1", features = ["rt", "macros"] }

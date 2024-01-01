@@ -29,16 +29,18 @@ pub enum TlsAcceptorError {
     Io(#[from] std::io::Error),
 }
 
-/// The HTTP protocol to use when clients are connecting.
-///
-/// This should match the version(s) of HTTP used to serve your application in Hyper.
-/// Using `Both` will prefer HTTP/2 over HTTP/1.1
-#[derive(Debug, Clone, Copy)]
-pub enum HttpProtocol {
-    Http1,
-    Http2,
-    Both,
-}
+// Only HTTP/1 is supported at the moment
+
+// /// The HTTP protocol to use when clients are connecting.
+// ///
+// /// This should match the version(s) of HTTP used to serve your application in Hyper.
+// /// Using `Both` will prefer HTTP/2 over HTTP/1.1
+// #[derive(Debug, Clone, Copy)]
+// pub enum HttpProtocol {
+//     Http1,
+//     Http2,
+//     Both,
+// }
 
 /// Get a `TlsAcceptor` from PEM certificate and key data
 ///
@@ -48,11 +50,10 @@ pub enum HttpProtocol {
 pub fn get_tlsacceptor_from_pem_data(
     cert_data: &str,
     key_data: &str,
-    protocol: HttpProtocol,
 ) -> Result<tokio_rustls::TlsAcceptor, TlsAcceptorError> {
     let mut cert_reader = BufReader::new(Cursor::new(cert_data));
     let mut key_reader = BufReader::new(Cursor::new(key_data));
-    get_tlsacceptor_from_readers(&mut cert_reader, &mut key_reader, protocol)
+    get_tlsacceptor_from_readers(&mut cert_reader, &mut key_reader)
 }
 
 /// Get a `TlsAcceptor` from PEM-encoded certificate and key files
@@ -63,7 +64,6 @@ pub fn get_tlsacceptor_from_pem_data(
 pub fn get_tlsacceptor_from_files(
     cert_path: impl AsRef<Path>,
     key_path: impl AsRef<Path>,
-    protocol: HttpProtocol,
 ) -> Result<tokio_rustls::TlsAcceptor, TlsAcceptorError> {
     let cert_file = File::open(cert_path).map_err(TlsAcceptorError::FileOpen)?;
     let key_file = File::open(key_path).map_err(TlsAcceptorError::FileOpen)?;
@@ -71,13 +71,12 @@ pub fn get_tlsacceptor_from_files(
     let mut cert_reader = BufReader::new(cert_file);
     let mut key_reader = BufReader::new(key_file);
 
-    get_tlsacceptor_from_readers(&mut cert_reader, &mut key_reader, protocol)
+    get_tlsacceptor_from_readers(&mut cert_reader, &mut key_reader)
 }
 
 fn get_tlsacceptor_from_readers(
     cert_reader: &mut dyn BufRead,
     key_reader: &mut dyn BufRead,
-    protocol: HttpProtocol,
 ) -> Result<tokio_rustls::TlsAcceptor, TlsAcceptorError> {
     let certs: Vec<_> = rustls_pemfile::certs(cert_reader)
         .filter_map(Result::ok)
@@ -95,11 +94,7 @@ fn get_tlsacceptor_from_readers(
         .with_no_client_auth()
         .with_single_cert(certs, key)?;
 
-    cfg.alpn_protocols = match protocol {
-        HttpProtocol::Http1 => vec![b"http/1.1".to_vec(), b"http/1.0".to_vec()],
-        HttpProtocol::Http2 => vec![b"h2".to_vec()],
-        HttpProtocol::Both => vec![b"h2".to_vec(), b"http/1.1".to_vec(), b"http/1.0".to_vec()],
-    };
+    cfg.alpn_protocols = vec![b"http/1.1".to_vec(), b"http/1.0".to_vec()];
 
     let acceptor = tokio_rustls::TlsAcceptor::from(Arc::new(cfg));
 

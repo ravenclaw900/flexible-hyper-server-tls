@@ -1,15 +1,22 @@
 use flexible_hyper_server_tls::*;
-use hyper::service::{make_service_fn, service_fn};
-use hyper::{Body, Request, Response, Server};
+use http_body_util::Full;
+use hyper::body::{Bytes, Incoming};
+use hyper::service::service_fn;
+use hyper::{Request, Response};
 use std::convert::Infallible;
-use std::time::Duration;
 use tokio::net::TcpListener;
 
-const CERT_DATA: &str = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/examples/certs/cert.pem"));
-const KEY_DATA: &str = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/examples/certs/key.pem"));
+const CERT_DATA: &str = include_str!(concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/examples/certs/cert.pem"
+));
+const KEY_DATA: &str = include_str!(concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/examples/certs/key.pem"
+));
 
-async fn hello_world(_req: Request<Body>) -> Result<Response<Body>, Infallible> {
-    Ok(Response::new("Hello, World".into()))
+async fn hello_world(_req: Request<Incoming>) -> Result<Response<Full<Bytes>>, Infallible> {
+    Ok(Response::new(Full::<Bytes>::from("Hello, World!")))
 }
 
 #[tokio::main(flavor = "current_thread")]
@@ -18,27 +25,18 @@ async fn main() {
 
     let listener = TcpListener::bind("127.0.0.1:8080").await.unwrap();
 
-    let make_svc = make_service_fn(|conn: &HttpOrHttpsConnection| {
-        println!("Remote address: {}", conn.remote_addr());
-        async { Ok::<_, Infallible>(service_fn(hello_world)) }
-    });
+    let builder = AcceptorBuilder::new(listener);
 
-    let acceptor = if use_tls {
-        let tls_acceptor = tlsconfig::get_tlsacceptor_from_pem_data(
-            CERT_DATA,
-            KEY_DATA,
-            tlsconfig::HttpProtocol::Both,
-        )
-        .unwrap();
-        HyperHttpOrHttpsAcceptor::new_https(listener, tls_acceptor, Duration::from_secs(10))
+    let mut acceptor = if use_tls {
+        let tls_acceptor =
+            rustls_helpers::get_tlsacceptor_from_pem_data(CERT_DATA, KEY_DATA).unwrap();
+        builder.https(tls_acceptor).build()
     } else {
-        HyperHttpOrHttpsAcceptor::new_http(listener)
+        builder.build()
     };
 
-    let mut server = Server::builder(acceptor).serve(make_svc);
-
     loop {
-        let res = (&mut server).await;
-        eprintln!("Error: {:?}", res);
+        let peer_addr = acceptor.accept(service_fn(hello_world)).await.unwrap();
+        println!("Connected peer: {}", peer_addr)
     }
 }
