@@ -5,14 +5,28 @@ use thiserror::Error;
 
 /// Choose to accept either a HTTP or HTTPS connection
 // Use a struct instead of the enum directly to avoid users constructing/matching on enum variants
-pub struct HttpOrHttpsAcceptor(AcceptorInner);
+pub struct HttpOrHttpsAcceptor(pub(crate) AcceptorInner);
 
-enum AcceptorInner {
+pub enum AcceptorInner {
     Http(tokio::net::TcpListener),
     Https(tls_listener::TlsListener<tokio::net::TcpListener, tokio_rustls::TlsAcceptor>),
 }
 
 impl HttpOrHttpsAcceptor {
+    pub async fn serve<S>(&mut self, service: S)
+    where
+        S: hyper::service::HttpService<hyper::body::Incoming> + Clone + Send + 'static,
+        S::Future: Send,
+        S::ResBody: Send + 'static,
+        <S::ResBody as hyper::body::Body>::Error: std::error::Error + Send + Sync + 'static,
+        <S::ResBody as hyper::body::Body>::Data: Send,
+    {
+        loop {
+            // Ignore result here
+            let _ = self.accept(service.clone()).await;
+        }
+    }
+
     pub async fn accept<S>(&mut self, service: S) -> Result<SocketAddr, AcceptorError>
     where
         S: hyper::service::HttpService<hyper::body::Incoming> + Send + 'static,

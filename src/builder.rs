@@ -3,7 +3,7 @@ use std::time::Duration;
 use tokio::net::TcpListener;
 use tokio_rustls::TlsAcceptor;
 
-use crate::accept::HttpOrHttpsAcceptor;
+use crate::accept::{AcceptorInner, HttpOrHttpsAcceptor};
 
 pub struct Http;
 pub struct Https {
@@ -42,7 +42,7 @@ impl AcceptorBuilder<Http> {
 
     /// Builds an `HttpOrHttpsAcceptor` to accept HTTP connections
     pub fn build(self) -> HttpOrHttpsAcceptor {
-        HttpOrHttpsAcceptor::Http(self.listener)
+        HttpOrHttpsAcceptor(AcceptorInner::Http(self.listener))
     }
 }
 
@@ -76,6 +76,6 @@ impl AcceptorBuilder<Https> {
 
         let tls_listener = tls_builder.listen(self.listener);
 
-        HttpOrHttpsAcceptor::Https(tls_listener)
+        HttpOrHttpsAcceptor(AcceptorInner::Https(tls_listener))
     }
 }
