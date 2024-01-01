@@ -20,7 +20,7 @@ hyper-util = { version = "0.1.2", features = ["tokio"] }
 rustls-pemfile = { version = "2.0.0", optional = true }
 thiserror = "1.0.52"
 tls-listener = { version = "0.9.1", features = ["rustls"] }
-tokio = { version = "1.35.1", features = ["net", "time"] }
+tokio = { version = "1.35.1", features = ["net"] }
 tokio-rustls = "0.25.0"
 
 [dev-dependencies]
