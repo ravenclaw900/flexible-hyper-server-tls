@@ -55,9 +55,11 @@ impl HttpOrHttpsAcceptor {
 
                 let conn = TokioIo::new(conn);
 
-                let conn = conn_builder.serve_connection(conn, service);
+                // Allow upgrades so websockets can be used in client code
+                let conn = conn_builder.serve_connection(conn, service).with_upgrades();
 
-                tokio::spawn(async move { conn.await.unwrap() });
+                // Ignore result here, it will only show up if client terminates connection without sending a request
+                tokio::spawn(conn);
 
                 Ok(peer_addr)
             }
@@ -78,9 +80,11 @@ impl HttpOrHttpsAcceptor {
 
                 let conn = TokioIo::new(conn);
 
-                let conn = conn_builder.serve_connection(conn, service);
+                // Allow upgrades so websockets can be used in client code
+                let conn = conn_builder.serve_connection(conn, service).with_upgrades();
 
-                tokio::spawn(async move { conn.await.unwrap() });
+                // Ignore result here, it will only show up if client terminates connection without sending a request
+                tokio::spawn(conn);
 
                 Ok(peer_addr)
             }
