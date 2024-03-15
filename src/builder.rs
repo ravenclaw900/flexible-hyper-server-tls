@@ -8,7 +8,6 @@ use crate::accept::{AcceptorInner, HttpOrHttpsAcceptor};
 pub struct Http;
 pub struct Https {
     tls_acceptor: tokio_rustls::TlsAcceptor,
-    max_handshakes: usize,
     timeout: Duration,
 }
 
@@ -36,7 +35,6 @@ impl AcceptorBuilder<Http> {
         AcceptorBuilder {
             state: Https {
                 tls_acceptor,
-                max_handshakes: tls_listener::DEFAULT_MAX_HANDSHAKES,
                 timeout: tls_listener::DEFAULT_HANDSHAKE_TIMEOUT,
             },
             listener: self.listener,
@@ -50,15 +48,6 @@ impl AcceptorBuilder<Http> {
 }
 
 impl AcceptorBuilder<Https> {
-    /// Set the maximum number of handshakes that will be processed concurrently
-    ///
-    /// Defaults to 64
-    #[must_use]
-    pub const fn max_handshakes(mut self, num: usize) -> Self {
-        self.state.max_handshakes = num;
-        self
-    }
-
     /// Set the maximum amount of time that a handshake can take before being aborted.
     /// Setting it to 0 will not disable the timeout, but will instead instantly drop every connection.
     ///
@@ -73,9 +62,7 @@ impl AcceptorBuilder<Https> {
     pub fn build(self) -> HttpOrHttpsAcceptor {
         let mut tls_builder = tls_listener::builder(self.state.tls_acceptor);
 
-        tls_builder
-            .max_handshakes(self.state.max_handshakes)
-            .handshake_timeout(self.state.timeout);
+        tls_builder.handshake_timeout(self.state.timeout);
 
         let tls_listener = tls_builder.listen(self.listener);
 
