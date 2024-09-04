@@ -40,10 +40,9 @@
 //! ```
 
 mod accept;
-mod builder;
 #[cfg(feature = "rustls_helpers")]
 pub mod rustls_helpers;
+mod stream;
 
 // Export into main library
 pub use accept::{AcceptorError, HttpOrHttpsAcceptor};
-pub use builder::AcceptorBuilder;

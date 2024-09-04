@@ -6,11 +6,11 @@ use hyper::{Request, Response};
 use std::convert::Infallible;
 use tokio::net::TcpListener;
 
-const CERT_DATA: &str = include_str!(concat!(
+const CERT_DATA: &[u8] = include_bytes!(concat!(
     env!("CARGO_MANIFEST_DIR"),
     "/examples/certs/cert.pem"
 ));
-const KEY_DATA: &str = include_str!(concat!(
+const KEY_DATA: &[u8] = include_bytes!(concat!(
     env!("CARGO_MANIFEST_DIR"),
     "/examples/certs/key.pem"
 ));
@@ -25,18 +25,20 @@ async fn main() {
 
     let listener = TcpListener::bind("127.0.0.1:8080").await.unwrap();
 
-    let builder = AcceptorBuilder::new(listener);
-
     let mut acceptor = if use_tls {
-        let tls_acceptor =
-            rustls_helpers::get_tlsacceptor_from_pem_data(CERT_DATA, KEY_DATA).unwrap();
-        builder.https(tls_acceptor).build()
+        let tls = rustls_helpers::get_tlsacceptor_from_pem_data(CERT_DATA, KEY_DATA).unwrap();
+        HttpOrHttpsAcceptor::new_https(listener, tls)
     } else {
-        builder.build()
+        HttpOrHttpsAcceptor::new_http(listener)
     };
 
     loop {
-        let peer_addr = acceptor.accept(service_fn(hello_world)).await.unwrap();
+        let peer_addr = acceptor
+            .accept(service_fn(hello_world), move |err| {
+                eprintln!("Error serving connection: {err:?}")
+            })
+            .await
+            .unwrap();
         println!("Connected peer: {}", peer_addr)
     }
 }
