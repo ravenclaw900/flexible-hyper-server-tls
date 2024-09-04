@@ -40,8 +40,8 @@ pub enum TlsAcceptorError {
 /// Errors if the files cannot be read, if there is no valid certificate/key data given, or if rustls fails to create
 /// the server config
 pub async fn get_tlsacceptor_from_files(
-    cert_path: impl AsRef<Path>,
-    key_path: impl AsRef<Path>,
+    cert_path: impl AsRef<Path> + Send,
+    key_path: impl AsRef<Path> + Send,
 ) -> Result<tokio_rustls::TlsAcceptor, TlsAcceptorError> {
     let cert_data = tokio::fs::read(cert_path)
         .await

@@ -28,16 +28,15 @@ async fn main() {
 
     let listener = TcpListener::bind("127.0.0.1:8080").await.unwrap();
 
-    let builder = AcceptorBuilder::new(listener);
-
     let mut acceptor = if use_tls {
-        let tls_acceptor =
-            rustls_helpers::get_tlsacceptor_from_files("./cert.cer", "./key.pem").unwrap();
-        builder.https(tls_acceptor).build()
+        let tls = rustls_helpers::get_tlsacceptor_from_files("./cert.cer", "./key.pem").unwrap();
+        HttpOrHttpsAcceptor::new_https(listener, tls_acceptor)
     } else {
-        builder.build()
+        HttpOrHttpsAcceptor::new_http(listener)
     };
 
-    acceptor.serve(service_fn(hello_world)).await;
+    acceptor.serve(service_fn(hello_world), |err| {
+        eprintln!("Error serving connection: {err:?}")
+    }).await;
 }
 ```

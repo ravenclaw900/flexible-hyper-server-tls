@@ -67,7 +67,7 @@ impl HttpOrHttpsAcceptor {
         S: HttpService<Incoming> + Send + 'static,
         S::Future: Send,
         S::ResBody: Send + 'static,
-        <S::ResBody as Body>::Error: std::error::Error + Send + Sync + 'static,
+        <S::ResBody as Body>::Error: std::error::Error + Send + Sync,
         <S::ResBody as Body>::Data: Send,
         F: FnOnce(AcceptorError) + Send + 'static,
     {
@@ -98,7 +98,7 @@ where
     S: HttpService<Incoming> + Send,
     S::Future: Send,
     S::ResBody: Send + 'static,
-    <S::ResBody as Body>::Error: std::error::Error + Send + Sync + 'static,
+    <S::ResBody as Body>::Error: std::error::Error + Send + Sync,
     <S::ResBody as Body>::Data: Send,
 {
     let client = match tls {
