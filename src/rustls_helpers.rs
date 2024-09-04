@@ -56,8 +56,7 @@ pub async fn get_tlsacceptor_from_files(
 /// Get a `TlsAcceptor` from PEM certificate and key data
 ///
 /// # Errors
-/// Errors if there is no valid certificate/key data given, or if rustls fails to create
-/// the server config
+/// Errors if there is no valid certificate/key data given or if rustls fails to create the server config
 pub fn get_tlsacceptor_from_pem_data(
     mut cert_data: &[u8],
     mut key_data: &[u8],

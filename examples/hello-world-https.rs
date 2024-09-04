@@ -34,7 +34,7 @@ async fn main() {
 
     loop {
         let peer_addr = acceptor
-            .accept(service_fn(hello_world), move |err| {
+            .accept(service_fn(hello_world), |err| {
                 eprintln!("Error serving connection: {err:?}")
             })
             .await

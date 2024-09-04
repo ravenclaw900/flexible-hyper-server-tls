@@ -5,6 +5,7 @@
 //! This is useful for applications that users will self-host, and have the option to run as HTTP or provide their own HTTPS certificates.
 //! At the moment, this library only supports accepting HTTP/1 connections
 //! **Note: HTTP and HTTPS cannot be accepted at the same time, you decide which one to use when creating the acceptor.**
+//! If you want to use both HTTP and HTTPS, you can create 2 acceptors listening on different ports.
 //! ## Example
 //! ```
 //! use flexible_hyper_server_tls::*;
@@ -25,17 +26,16 @@
 //!
 //!     let listener = TcpListener::bind("127.0.0.1:8080").await.unwrap();
 //!
-//!     let builder = AcceptorBuilder::new(listener);
-//!
 //!     let mut acceptor = if use_tls {
-//!         let tls_acceptor =
-//!             rustls_helpers::get_tlsacceptor_from_files("./cert.cer", "./key.pem").unwrap();
-//!         builder.https(tls_acceptor).build()
+//!         let tls = rustls_helpers::get_tlsacceptor_from_files("./cert.cer", "./key.pem").unwrap();
+//!         HttpOrHttpsAcceptor::new_https(listener, tls_acceptor)
 //!     } else {
-//!         builder.build()
+//!         HttpOrHttpsAcceptor::new_http(listener)
 //!     };
 //!
-//!     acceptor.serve(service_fn(hello_world)).await;
+//!     acceptor.serve(service_fn(hello_world), |err| {
+//!         eprintln!("Error serving connection: {err:?}")
+//!     }).await;
 //! }
 //! ```
 
