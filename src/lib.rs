@@ -4,8 +4,16 @@
 //! This library lets you easily create a Hyper acceptor that be configured to either accept HTTP or HTTPS connections.
 //! This is useful for applications that users will self-host, and have the option to run as HTTP or provide their own HTTPS certificates.
 //! At the moment, this library only supports accepting HTTP/1 connections
-//! **Note: HTTP and HTTPS cannot be accepted at the same time, you decide which one to use when creating the acceptor.**
+//!
+//! **Note: HTTP and HTTPS cannot be accepted at the same time, you decide which one to use when creating the acceptor.**  
 //! If you want to use both HTTP and HTTPS, you can create 2 acceptors listening on different ports.
+//!
+//! ## Features
+//! - `rustls_helpers` (enabled by default): Provides some helpers for configuring TLS
+//! - `tls12` (enabled by default): Enables support for TLS 1.2
+//! - `aws_lc_rs` (enabled by default): Uses the `aws_lc_rs` crate for cryptography
+//! - `ring`: Uses the `ring` crate for cryptography
+//!
 //! ## Example
 //! ```
 //! use flexible_hyper_server_tls::*;

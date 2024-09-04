@@ -9,15 +9,14 @@ use tokio_rustls::TlsAcceptor;
 
 use crate::stream::HttpOrHttpsStream;
 
-/// Choose to accept either a HTTP or HTTPS connection
-///
-/// Created by calling the `build` method on an `AcceptorBuilder`
+/// Accept either an HTTP or HTTPS connection using Hyper
 pub struct HttpOrHttpsAcceptor {
     pub(crate) listener: TcpListener,
     pub(crate) tls: Option<TlsAcceptor>,
 }
 
 impl HttpOrHttpsAcceptor {
+    /// Create a new `HttpOrHttpsAcceptor` to serve HTTP.
     pub const fn new_http(listener: TcpListener) -> Self {
         Self {
             listener,
@@ -25,6 +24,7 @@ impl HttpOrHttpsAcceptor {
         }
     }
 
+    /// Create a new `HttpOrHttpsAcceptor` to serve HTTPS with a provided [`TlsAcceptor`].
     pub const fn new_https(listener: TcpListener, tls: TlsAcceptor) -> Self {
         Self {
             listener,
