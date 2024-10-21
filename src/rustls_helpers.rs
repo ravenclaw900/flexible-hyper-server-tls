@@ -5,6 +5,8 @@
 use std::path::Path;
 use std::sync::Arc;
 
+use rustls_pki_types::pem::PemObject;
+use rustls_pki_types::{CertificateDer, PrivateKeyDer};
 use thiserror::Error;
 use tokio_rustls::rustls;
 
@@ -13,7 +15,7 @@ use tokio_rustls::rustls;
 pub enum TlsAcceptorError {
     /// PEM data was invalid
     #[error("invalid pem data")]
-    InvalidPem(#[source] std::io::Error),
+    InvalidPem(#[from] rustls_pki_types::pem::Error),
     /// Rustls failed to create the `ServerConfig`
     #[error("failed to create ServerConfig")]
     ServerConfig(#[from] rustls::Error),
@@ -59,21 +61,12 @@ pub async fn get_tlsacceptor_from_files(
 /// # Errors
 /// Errors if there is no valid certificate/key data given or if rustls fails to create the [`ServerConfig`](rustls::ServerConfig)
 pub fn get_tlsacceptor_from_pem_data(
-    mut cert_data: &[u8],
-    mut key_data: &[u8],
+    cert_data: &[u8],
+    key_data: &[u8],
 ) -> Result<tokio_rustls::TlsAcceptor, TlsAcceptorError> {
-    let certs: Vec<_> = rustls_pemfile::certs(&mut cert_data)
-        .collect::<Result<_, _>>()
-        .map_err(TlsAcceptorError::InvalidPem)?;
+    let certs: Vec<_> = CertificateDer::pem_slice_iter(cert_data).collect::<Result<_, _>>()?;
 
-    let key = rustls_pemfile::private_key(&mut key_data)
-        .map_err(TlsAcceptorError::InvalidPem)?
-        .ok_or_else(|| {
-            TlsAcceptorError::InvalidPem(std::io::Error::new(
-                std::io::ErrorKind::InvalidData,
-                "missing private key",
-            ))
-        })?;
+    let key = PrivateKeyDer::from_pem_slice(key_data)?;
 
     let mut cfg = rustls::server::ServerConfig::builder()
         .with_no_client_auth()

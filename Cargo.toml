@@ -11,16 +11,16 @@ exclude = ["examples/certs"]
 
 [features]
 default = ["rustls_helpers", "aws_lc_rs", "tls12"]
-rustls_helpers = ["dep:rustls-pemfile", "tokio/fs"]
+rustls_helpers = ["tokio/fs"]
 aws_lc_rs = ["tokio-rustls/aws_lc_rs"]
 ring = ["tokio-rustls/ring"]
 tls12 = ["tokio-rustls/tls12"]
 
 [dependencies]
 # Will figure out how to handle http1 vs. http2 later
-hyper = { version = "1.4.1", features = ["server", "http1"] }
-hyper-util = { version = "0.1.7", features = ["tokio"] }
-rustls-pemfile = { version = "2.1.3", optional = true }
+hyper = { version = "1.5.0", features = ["server", "http1"] }
+hyper-util = { version = "0.1.9", features = ["tokio"] }
+rustls-pki-types = "1.10.0"
 thiserror = "1.0.63"
 tokio = { version = "1.40.0", features = ["net", "rt"] }
 tokio-rustls = { version = "0.26.0", default-features = false, features = [
