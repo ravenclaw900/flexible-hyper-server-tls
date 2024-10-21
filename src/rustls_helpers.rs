@@ -4,6 +4,7 @@
 
 use std::path::Path;
 use std::sync::Arc;
+
 use thiserror::Error;
 use tokio_rustls::rustls;
 
@@ -38,7 +39,7 @@ pub enum TlsAcceptorError {
 ///
 /// # Errors
 /// Errors if the files cannot be read, if there is no valid certificate/key data given, or if rustls fails to create
-/// the server config
+/// the [`ServerConfig`](rustls::ServerConfig)
 pub async fn get_tlsacceptor_from_files(
     cert_path: impl AsRef<Path> + Send,
     key_path: impl AsRef<Path> + Send,
@@ -56,7 +57,7 @@ pub async fn get_tlsacceptor_from_files(
 /// Get a `TlsAcceptor` from PEM certificate and key data
 ///
 /// # Errors
-/// Errors if there is no valid certificate/key data given or if rustls fails to create the server config
+/// Errors if there is no valid certificate/key data given or if rustls fails to create the [`ServerConfig`](rustls::ServerConfig)
 pub fn get_tlsacceptor_from_pem_data(
     mut cert_data: &[u8],
     mut key_data: &[u8],

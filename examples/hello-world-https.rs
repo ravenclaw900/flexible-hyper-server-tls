@@ -25,20 +25,16 @@ async fn main() {
 
     let listener = TcpListener::bind("127.0.0.1:8080").await.unwrap();
 
-    let mut acceptor = if use_tls {
+    let mut acceptor = HttpOrHttpsAcceptor::new(listener)
+        .with_err_handler(|err| eprintln!("Error serving connection: {err:?}"));
+
+    if use_tls {
         let tls = rustls_helpers::get_tlsacceptor_from_pem_data(CERT_DATA, KEY_DATA).unwrap();
-        HttpOrHttpsAcceptor::new_https(listener, tls)
-    } else {
-        HttpOrHttpsAcceptor::new_http(listener)
-    };
+        acceptor = acceptor.with_tls(tls);
+    }
 
     loop {
-        let peer_addr = acceptor
-            .accept(service_fn(hello_world), |err| {
-                eprintln!("Error serving connection: {err:?}")
-            })
-            .await
-            .unwrap();
+        let peer_addr = acceptor.accept(service_fn(hello_world)).await;
         println!("Connected peer: {}", peer_addr)
     }
 }

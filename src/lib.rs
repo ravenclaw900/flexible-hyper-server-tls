@@ -34,16 +34,17 @@
 //!
 //!     let listener = TcpListener::bind("127.0.0.1:8080").await.unwrap();
 //!
-//!     let mut acceptor = if use_tls {
+//!     let mut acceptor = HttpOrHttpsAcceptor::new(listener)
+//!         .with_err_handler(|err| eprintln!("Error serving connection: {err:?}"));
+//!     
+//!     if use_tls {
 //!         let tls = rustls_helpers::get_tlsacceptor_from_files("./cert.cer", "./key.pem").unwrap();
-//!         HttpOrHttpsAcceptor::new_https(listener, tls_acceptor)
-//!     } else {
-//!         HttpOrHttpsAcceptor::new_http(listener)
-//!     };
+//!         acceptor = acceptor.with_tls(tls);
+//!     }
 //!
-//!     acceptor.serve(service_fn(hello_world), |err| {
-//!         eprintln!("Error serving connection: {err:?}")
-//!     }).await;
+//!     loop {
+//!         acceptor.accept(service_fn(hello_world)).await;
+//!     }
 //! }
 //! ```
 
