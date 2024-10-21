@@ -1,6 +1,6 @@
 [package]
 name = "flexible-hyper-server-tls"
-version = "0.4.0"
+version = "0.5.0"
 edition = "2021"
 license = "MIT OR Apache-2.0"
 description = "Easily choose between HTTP or HTTPS when using hyper"
@@ -23,9 +23,7 @@ hyper-util = { version = "0.1.9", features = ["tokio"] }
 rustls-pki-types = "1.10.0"
 thiserror = "1.0.63"
 tokio = { version = "1.40.0", features = ["net", "rt"] }
-tokio-rustls = { version = "0.26.0", default-features = false, features = [
-    "logging",
-] }
+tokio-rustls = { version = "0.26.0", default-features = false }
 
 [dev-dependencies]
 http-body-util = "0.1.2"
