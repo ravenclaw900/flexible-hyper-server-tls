@@ -1,5 +1,4 @@
 use std::net::SocketAddr;
-use std::sync::Arc;
 
 use hyper::body::{Body, Incoming};
 use hyper::server::conn::http1;
@@ -15,16 +14,14 @@ use crate::stream::HttpOrHttpsStream;
 pub struct HttpOrHttpsAcceptor {
     listener: TcpListener,
     tls: Option<TlsAcceptor>,
-    err_handler: Arc<dyn Fn(AcceptorError) + Send + Sync>,
 }
 
 impl HttpOrHttpsAcceptor {
-    /// Creates a new [`HttpOrHttpsAcceptor`] with the default configuration (serve HTTP, silently ignore errors)
-    pub fn new(listener: TcpListener) -> Self {
+    /// Creates a new [`HttpOrHttpsAcceptor`] configured to only serve HTTP
+    pub const fn new(listener: TcpListener) -> Self {
         Self {
             listener,
             tls: None,
-            err_handler: Arc::new(|_| {}),
         }
     }
 
@@ -37,46 +34,34 @@ impl HttpOrHttpsAcceptor {
         self
     }
 
-    /// Configures this [`HttpOrHttpsAcceptor`] to call the provided error handler on errors
-    #[must_use]
-    pub fn with_err_handler<F>(mut self, err_handler: F) -> Self
-    where
-        F: Fn(AcceptorError) + Send + Sync + 'static,
-    {
-        self.err_handler = Arc::new(err_handler);
-        self
-    }
-
-    /// Accepts a singular connection and spawns it onto the tokio runtime.
-    /// Returns the address of the connected client.
+    /// Accepts a singular connection.
+    /// Returns a the peer address of the connected client and a future that MUST be spawned to serve the connection.
     ///
     /// # Errors
-    /// Never returns an error. The configured error handler will be called if the TCP connection, TLS handshake, or Hyper connection fails.
-    pub async fn accept<S>(&mut self, service: S) -> SocketAddr
+    /// The function will return an error if the TCP connection fails, the returned future will return an error if the TLS handshake or Hyper service fails.
+    pub async fn accept<S>(
+        &self,
+        service: S,
+    ) -> Result<
+        (
+            SocketAddr,
+            impl Future<Output = Result<(), AcceptorError>> + use<S>,
+        ),
+        AcceptorError,
+    >
     where
-        S: HttpService<Incoming> + Send + 'static,
-        S::Future: Send,
-        S::ResBody: Send,
+        S: HttpService<Incoming> + 'static,
         <S::ResBody as Body>::Error: std::error::Error + Send + Sync,
-        <S::ResBody as Body>::Data: Send,
     {
-        loop {
-            match self.listener.accept().await {
-                Ok((stream, peer_addr)) => {
-                    // The TlsAcceptor is a wrapper around an Arc, so this is relatively cheap
-                    let cloned_tls = self.tls.clone();
-                    let cloned_err_handler = self.err_handler.clone();
+        match self.listener.accept().await {
+            Ok((stream, peer_addr)) => {
+                // The TlsAcceptor is a wrapper around an Arc, so this is relatively cheap
+                let cloned_tls = self.tls.clone();
 
-                    tokio::spawn(async move {
-                        if let Err(err) = handle_conn(stream, cloned_tls, service).await {
-                            cloned_err_handler(err);
-                        }
-                    });
-
-                    return peer_addr;
-                }
-                Err(e) => (self.err_handler)(AcceptorError::TcpConnect(e)),
-            };
+                let conn_fut = handle_conn(stream, cloned_tls, service);
+                Ok((peer_addr, conn_fut))
+            }
+            Err(e) => Err(AcceptorError::TcpConnect(e)),
         }
     }
 }
@@ -87,11 +72,9 @@ async fn handle_conn<S>(
     handler: S,
 ) -> Result<(), AcceptorError>
 where
-    S: HttpService<Incoming> + Send,
-    S::Future: Send,
-    S::ResBody: Send + 'static,
+    S: HttpService<Incoming>,
+    S::ResBody: 'static,
     <S::ResBody as Body>::Error: std::error::Error + Send + Sync,
-    <S::ResBody as Body>::Data: Send,
 {
     let client = match tls {
         None => HttpOrHttpsStream::Http(stream),
